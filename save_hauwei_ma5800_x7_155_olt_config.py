@@ -1,16 +1,16 @@
 import paramiko
 import time
-from datetime import datetime
 import re
+from datetime import datetime
 import sys
 
-OLT_IP = "192.168.164.155"  
+OLT_IP = "192.168.164.155"  # 請填寫正確 IP
 OLT_PORT = 22
 OLT_USER = "adminsqa"
 OLT_PASS = "pon1234"
-
 PROMPT = "MA5800-X7#"
-TIMEOUT = 300  # 最多等 5 分鐘
+MORE_FLAG = "-- More --"
+TIMEOUT = 600
 
 def strip_ansi_sequences(text):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -18,10 +18,10 @@ def strip_ansi_sequences(text):
 
 def save_config():
     log_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"huawei_ma5800_x7_155_olt_save_config_log_{log_time}.txt"
+    log_file = f"huawei_ma5800_config_log_{log_time}.txt"
 
     try:
-        print(f"[INFO] Connecting to OLT {OLT_IP}...")
+        print("[INFO] Connecting to OLT...")
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(OLT_IP, port=OLT_PORT, username=OLT_USER, password=OLT_PASS,
@@ -31,38 +31,49 @@ def save_config():
         time.sleep(1)
         chan.recv(9999)  # 清 welcome 訊息
 
-        output = ""
-        print(f"[INFO] Sending 'display current-configuration' command...")
-        chan.send("display current-configuration\n")
+        # 切換 enable 模式
+        chan.send("enable\n")
+        time.sleep(1)
+        chan.recv(4096)
 
+        # 發送指令
+        chan.send("display current-configuration\n")
+        time.sleep(2)
+
+        output = ""
         start_time = time.time()
+
         while True:
             if chan.recv_ready():
                 chunk = chan.recv(4096).decode(errors="ignore")
                 output += chunk
-                cleaned_chunk = strip_ansi_sequences(chunk)
-                print(cleaned_chunk.strip())  # 即時印出
+                print(strip_ansi_sequences(chunk).strip())
 
-                if PROMPT in chunk:
-                    print("[INFO] Complete configuration output received.")
+                # 如果遇到 -- More -- 則送出空白鍵
+                if MORE_FLAG in chunk:
+                    chan.send(" ")
+                    time.sleep(0.2)
+                elif PROMPT in chunk:
+                    print("[INFO] Prompt received. Output complete.")
                     break
 
             if time.time() - start_time > TIMEOUT:
-                print(f"[WARNING] Timeout after {TIMEOUT} seconds.")
+                print("[WARNING] Timeout reached.")
                 break
-            time.sleep(1)
+
+            time.sleep(0.5)
 
         cleaned_output = strip_ansi_sequences(output)
 
         with open(log_file, "w", encoding="utf-8") as f:
             f.write(cleaned_output)
 
-        print(f"[INFO] ✅ Saved configuration log to {log_file}")
+        print(f"[INFO] ✅ Saved configuration to {log_file}")
         chan.close()
         ssh.close()
 
     except Exception as e:
-        print(f"[ERROR] ❌ Failed to save configuration: {e}")
+        print(f"[ERROR] ❌ Failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
