@@ -4,17 +4,16 @@ import re
 from datetime import datetime
 import sys
 
-# === 基本連線資訊 ===
-OLT_IP = "192.168.164.155"  # ← 請填寫實際 IP
+# === 連線資訊 ===
+OLT_IP = "192.168.164.155"  # ← 改成你的 OLT IP
 OLT_PORT = 22
 OLT_USER = "adminsqa"
 OLT_PASS = "pon1234"
 
 PROMPT = "MA5800-X7#"
-MORE_FLAG = "-- More --"
-TIMEOUT = 180  # 最長等待秒數
+MORE_FLAG = "-- More"
+TIMEOUT = 120  # 最長等待秒數
 
-# 清除 ANSI 控制碼
 def strip_ansi_sequences(text):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
@@ -34,20 +33,21 @@ def save_config():
         time.sleep(1)
         chan.recv(9999)  # 清 welcome 訊息
 
-        # === 進入 enable 模式 ===
+        # 進入 enable 模式
         chan.send("enable\n")
         time.sleep(1)
         chan.recv(9999)
 
-        # === 清空畫面避免干擾 ===
+        # 清空提示
         chan.send("\n")
         time.sleep(1)
         chan.recv(9999)
 
-        # === 發送主指令 ===
+        # 發送主命令
         print("[INFO] Sending 'display current-configuration'...")
         chan.send("display current-configuration\n")
-        chan.send("\n")  # 再補一個換行，明確按 Enter
+        time.sleep(0.5)
+        chan.send("\n")  # 確保命令完整送出
         time.sleep(2)
 
         output = ""
@@ -58,15 +58,15 @@ def save_config():
                 chunk = chan.recv(4096).decode(errors="ignore")
                 output += chunk
                 cleaned_chunk = strip_ansi_sequences(chunk)
-                print(cleaned_chunk.strip())  # 即時輸出至 Jenkins Console
+                print(cleaned_chunk.strip())
 
-                # 處理分頁
-                if MORE_FLAG in chunk:
-                    chan.send(" ")  # 發送空白鍵
-                    time.sleep(0.2)
-                elif PROMPT in chunk:
+                if PROMPT in chunk:
                     print("[INFO] Prompt received — output complete.")
-                    break
+                    break  # ✅ 一看到 prompt 就結束
+
+                elif MORE_FLAG in chunk:
+                    chan.send(" ")  # 模擬空白鍵
+                    time.sleep(0.2)
 
             if time.time() - start_time > TIMEOUT:
                 print("[WARNING] Timeout reached.")
@@ -89,3 +89,5 @@ def save_config():
 
 if __name__ == "__main__":
     save_config()
+
+
