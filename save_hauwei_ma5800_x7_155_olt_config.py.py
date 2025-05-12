@@ -18,7 +18,7 @@ def strip_ansi_sequences(text):
 
 def save_config():
     log_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = f"huawei_ma5800_config_log_{log_time}.txt"
+    log_file = f"huawei_ma5800_x7_155_olt_save_config_log_{log_time}.txt"
 
     try:
         print(f"[INFO] Connecting to OLT {OLT_IP}...")
