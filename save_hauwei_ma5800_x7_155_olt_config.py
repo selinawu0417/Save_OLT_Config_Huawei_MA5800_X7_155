@@ -47,6 +47,7 @@ def save_config():
         # === 發送主指令 ===
         print("[INFO] Sending 'display current-configuration'...")
         chan.send("display current-configuration\n")
+        chan.send("\n")  # 再補一個換行，明確按 Enter
         time.sleep(2)
 
         output = ""
