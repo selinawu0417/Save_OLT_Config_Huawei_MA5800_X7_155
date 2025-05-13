@@ -90,12 +90,13 @@ def save_config():
                 cleaned_chunk = strip_ansi_sequences(chunk)
                 print(cleaned_chunk.strip())
 
-                if PROMPT in chunk:
-                    print("[INFO] Prompt received — output complete.")
-                    break
-                elif MORE_FLAG in chunk:
+                if "---- More" in chunk or "-- More" in chunk:
                     chan.send(" ")
                     time.sleep(0.2)
+
+                elif PROMPT in chunk:
+                    print("[INFO] Prompt received — output complete.")
+                    break
 
             if time.time() - start_time > TIMEOUT:
                 print("[WARNING] Timeout reached.")
