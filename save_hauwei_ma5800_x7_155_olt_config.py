@@ -43,7 +43,37 @@ def save_config():
         time.sleep(1)
         chan.recv(9999)
 
-        # 發送主命令
+        # Step 1: 儲存設定
+        print("[INFO] Sending 'save' command...")
+        chan.send("save\n")
+        output = ""
+        start_time = time.time()
+
+        while True:
+            if chan.recv_ready():
+                chunk = chan.recv(4096).decode(errors="ignore")
+                output += chunk
+                print(strip_ansi_sequences(chunk).strip())
+
+                # 若需要按 enter 確認就送出
+                if re.search(r"\{\s*<cr>.*\}:", chunk):
+                    chan.send("\n")
+                    time.sleep(1)
+
+                if PROMPT in chunk:
+                    print("[INFO] ✅ Configuration save completed.")
+                    break
+
+            if time.time() - start_time > TIMEOUT:
+                print("[WARNING] Timeout waiting for save to complete.")
+                break
+            time.sleep(0.5)
+
+        # Step 2: 等 10 秒讓系統完成背景備份
+        print("[INFO] Waiting 10 seconds after save...")
+        time.sleep(10)
+
+        # Step 3: 顯示設定
         print("[INFO] Sending 'display current-configuration'...")
         chan.send("display current-configuration\n")
         time.sleep(0.5)
@@ -70,17 +100,15 @@ def save_config():
             if time.time() - start_time > TIMEOUT:
                 print("[WARNING] Timeout reached.")
                 break
-
             time.sleep(0.5)
 
-        # 清除 ANSI 及 More 提示
+        # 清除 ANSI 與提示文字
         cleaned_output = strip_ansi_sequences(output)
         cleaned_output = re.sub(r"---- More \( Press 'Q' to break \) ----", "", cleaned_output)
 
-        # 補縮排排版處理
+        # 美化排版
         formatted_lines = []
         for line in cleaned_output.splitlines():
-            # 判斷是否需要縮排（不是以關鍵字開頭的指令，表示是被覆蓋顯示的內容）
             if line and not re.match(r"^(port|ont|gem|commit|tcont|quit|omcc|fec|vlan|multicast|xpon|switch|board|sysmode|#)", line):
                 formatted_lines.append("    " + line.strip())
             else:
